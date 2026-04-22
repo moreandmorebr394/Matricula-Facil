@@ -1,518 +1,609 @@
-"""
-Sistema Facil de Matriculas - Tela de Cadastro
-Aplicacao desktop em Tkinter
-
-Como rodar:
-    python sistema_facil.py
-
-Requisitos:
-    - Python 3.8+
-    - Pillow (opcional, para exibir a logo PNG):  pip install pillow
-"""
-
 import re
 import tkinter as tk
-from tkinter import ttk, messagebox
-from datetime import datetime
-import os
-
-try:
-    from PIL import Image, ImageTk
-    PIL_OK = True
-except ImportError:
-    PIL_OK = False
+from tkinter import messagebox, font as tkfont
 
 
-# ----------------- Paleta de cores (Navy + Dourado) -----------------
-NAVY        = "#163A5F"
-NAVY_DARK   = "#0F2A47"
-NAVY_LIGHT  = "#1F4D7A"
-GOLD        = "#F4B528"
-GOLD_DARK   = "#D89A14"
-WHITE       = "#FFFFFF"
-CREAM       = "#FAF8F3"
-GRAY_BG     = "#F4F5F7"
-GRAY_BORDER = "#D6DAE0"
-GRAY_TEXT   = "#5B6470"
-DARK_TEXT   = "#1A2332"
-ERROR_RED   = "#D14343"
+COR_AZUL_ESCURO = "#112250"
+COR_AZUL_PAINEL = "#3C507D"
+COR_AZUL_CLARO = "#5C6FA0"
+COR_AZUL_DESTAQUE = "#1E3A8A"
+COR_AZUL_HOVER = "#2A4BB5"
+COR_DOURADO = "#E0C58F"
+COR_DOURADO_ESCURO = "#C9A96A"
+COR_AMARELO = "#F5B83D"
+COR_BRANCO = "#FFFFFF"
+COR_OFFWHITE = "#FBFAF7"
+COR_CINZA_PLACEHOLDER = "#7A6B4F"
+COR_TEXTO_SECUNDARIO = "#5A6B8C"
 
 
-# ----------------- Mascaras -----------------
-def mask_cpf(value: str) -> str:
-    digits = re.sub(r"\D", "", value)[:11]
-    out = digits
-    if len(digits) > 9:
-        out = f"{digits[:3]}.{digits[3:6]}.{digits[6:9]}-{digits[9:]}"
-    elif len(digits) > 6:
-        out = f"{digits[:3]}.{digits[3:6]}.{digits[6:]}"
-    elif len(digits) > 3:
-        out = f"{digits[:3]}.{digits[3:]}"
-    return out
+class CampoEntrada(tk.Frame):
+    """Campo de entrada arredondado com ícone, placeholder e suporte a senha."""
 
+    def __init__(
+        self,
+        master,
+        placeholder,
+        icone="",
+        is_password=False,
+        largura=360,
+        altura=48,
+        **kwargs,
+    ):
+        super().__init__(master, bg=COR_BRANCO, **kwargs)
+        self.placeholder = placeholder
+        self.is_password = is_password
+        self.largura = largura
+        self.altura = altura
 
-def mask_phone(value: str) -> str:
-    digits = re.sub(r"\D", "", value)[:11]
-    if len(digits) > 10:
-        return f"({digits[:2]}) {digits[2:7]}-{digits[7:]}"
-    if len(digits) > 6:
-        return f"({digits[:2]}) {digits[2:6]}-{digits[6:]}"
-    if len(digits) > 2:
-        return f"({digits[:2]}) {digits[2:]}"
-    return digits
+        self.canvas = tk.Canvas(
+            self,
+            width=largura,
+            height=altura,
+            bg=COR_BRANCO,
+            highlightthickness=0,
+            bd=0,
+        )
+        self.canvas.pack()
 
+        self._desenhar_fundo(borda=COR_DOURADO_ESCURO)
 
-def mask_date(value: str) -> str:
-    digits = re.sub(r"\D", "", value)[:8]
-    if len(digits) > 4:
-        return f"{digits[:2]}/{digits[2:4]}/{digits[4:]}"
-    if len(digits) > 2:
-        return f"{digits[:2]}/{digits[2:]}"
-    return digits
+        if icone:
+            self.canvas.create_text(
+                20,
+                altura // 2,
+                text=icone,
+                fill=COR_AZUL_ESCURO,
+                font=("Segoe UI Symbol", 14, "bold"),
+            )
+            offset_x = 42
+        else:
+            offset_x = 18
 
-
-# ----------------- Validacoes -----------------
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
-
-def validate_cpf(cpf: str) -> bool:
-    digits = re.sub(r"\D", "", cpf)
-    if len(digits) != 11 or digits == digits[0] * 11:
-        return False
-    for i in (9, 10):
-        s = sum(int(digits[j]) * ((i + 1) - j) for j in range(i))
-        d = (s * 10) % 11 % 10
-        if d != int(digits[i]):
-            return False
-    return True
-
-
-def validate_date(text: str) -> bool:
-    try:
-        datetime.strptime(text, "%d/%m/%Y")
-        return True
-    except ValueError:
-        return False
-
-
-# ----------------- Widgets customizados -----------------
-class RoundedEntry(tk.Frame):
-    """Entry com borda arredondada simulada e foco visivel."""
-
-    def __init__(self, master, placeholder="", show=None, width=28, **kw):
-        super().__init__(master, bg=WHITE, highlightthickness=1,
-                         highlightbackground=GRAY_BORDER,
-                         highlightcolor=NAVY)
         self.var = tk.StringVar()
         self.entry = tk.Entry(
             self,
             textvariable=self.var,
-            font=("Segoe UI", 11),
             bd=0,
             relief="flat",
-            bg=WHITE,
-            fg=DARK_TEXT,
-            insertbackground=NAVY,
-            width=width,
-            show=show or "",
+            bg=COR_DOURADO,
+            fg=COR_AZUL_ESCURO,
+            insertbackground=COR_AZUL_ESCURO,
+            font=("Segoe UI", 11),
+            highlightthickness=0,
         )
-        self.entry.pack(fill="x", padx=12, pady=10)
-        self.placeholder = placeholder
-        self._show = show or ""
-        self._has_placeholder = False
-        self._set_placeholder()
+        entry_w = largura - offset_x - 18
+        self.canvas.create_window(
+            offset_x,
+            altura // 2,
+            anchor="w",
+            window=self.entry,
+            width=entry_w,
+            height=altura - 16,
+        )
 
+        self._mostrar_placeholder()
         self.entry.bind("<FocusIn>", self._on_focus_in)
         self.entry.bind("<FocusOut>", self._on_focus_out)
 
-    def _set_placeholder(self):
-        if not self.var.get():
-            self._has_placeholder = True
-            self.entry.config(fg=GRAY_TEXT, show="")
-            self.var.set(self.placeholder)
+    def _desenhar_fundo(self, borda):
+        self.canvas.delete("fundo")
+        self._round_rect(
+            2,
+            2,
+            self.largura - 2,
+            self.altura - 2,
+            r=14,
+            fill=COR_DOURADO,
+            outline=borda,
+            width=1,
+            tag="fundo",
+        )
+        self.canvas.tag_lower("fundo")
 
-    def _clear_placeholder(self):
-        if self._has_placeholder:
-            self.var.set("")
-            self.entry.config(fg=DARK_TEXT, show=self._show)
-            self._has_placeholder = False
+    def _round_rect(self, x1, y1, x2, y2, r=12, **kwargs):
+        pontos = [
+            x1 + r, y1,
+            x2 - r, y1,
+            x2, y1,
+            x2, y1 + r,
+            x2, y2 - r,
+            x2, y2,
+            x2 - r, y2,
+            x1 + r, y2,
+            x1, y2,
+            x1, y2 - r,
+            x1, y1 + r,
+            x1, y1,
+        ]
+        return self.canvas.create_polygon(pontos, smooth=True, **kwargs)
+
+    def _mostrar_placeholder(self):
+        self.entry.config(fg=COR_CINZA_PLACEHOLDER, show="")
+        self.var.set(self.placeholder)
+        self._placeholder_ativo = True
 
     def _on_focus_in(self, _):
-        self._clear_placeholder()
-        self.config(highlightbackground=NAVY, highlightthickness=2)
+        if self._placeholder_ativo:
+            self.var.set("")
+            self.entry.config(fg=COR_AZUL_ESCURO)
+            if self.is_password:
+                self.entry.config(show="•")
+            self._placeholder_ativo = False
+        self._desenhar_fundo(borda=COR_AZUL_ESCURO)
 
     def _on_focus_out(self, _):
-        self.config(highlightbackground=GRAY_BORDER, highlightthickness=1)
-        self._set_placeholder()
+        if not self.var.get():
+            self._mostrar_placeholder()
+        self._desenhar_fundo(borda=COR_DOURADO_ESCURO)
 
-    def get(self) -> str:
-        return "" if self._has_placeholder else self.var.get()
-
-    def set(self, value: str):
-        self._has_placeholder = False
-        self.entry.config(fg=DARK_TEXT, show=self._show)
-        self.var.set(value)
-
-    def set_error(self, on: bool):
-        color = ERROR_RED if on else GRAY_BORDER
-        self.config(highlightbackground=color)
+    def get(self):
+        if self._placeholder_ativo:
+            return ""
+        return self.var.get()
 
 
-class HoverButton(tk.Button):
-    def __init__(self, master, bg, hover_bg, fg, **kw):
-        super().__init__(master, bg=bg, fg=fg, activebackground=hover_bg,
-                         activeforeground=fg, bd=0, relief="flat",
-                         cursor="hand2", **kw)
-        self._bg = bg
-        self._hover = hover_bg
-        self.bind("<Enter>", lambda _: self.config(bg=self._hover))
-        self.bind("<Leave>", lambda _: self.config(bg=self._bg))
+class BotaoArredondado(tk.Canvas):
+    """Botão arredondado com efeito hover."""
 
+    def __init__(
+        self,
+        master,
+        texto,
+        comando,
+        largura=360,
+        altura=50,
+        cor=COR_AZUL_DESTAQUE,
+        cor_hover=COR_AZUL_HOVER,
+        cor_texto=COR_BRANCO,
+        fonte=("Segoe UI", 12, "bold"),
+        raio=14,
+    ):
+        super().__init__(
+            master,
+            width=largura,
+            height=altura,
+            bg=COR_BRANCO,
+            highlightthickness=0,
+            bd=0,
+        )
+        self.texto = texto
+        self.comando = comando
+        self.largura = largura
+        self.altura = altura
+        self.cor = cor
+        self.cor_hover = cor_hover
+        self.cor_texto = cor_texto
+        self.fonte = fonte
+        self.raio = raio
 
-# ----------------- Painel direito decorativo -----------------
-class RightPanel(tk.Canvas):
-    def __init__(self, master, **kw):
-        super().__init__(master, bg=NAVY, highlightthickness=0, **kw)
-        self.bind("<Configure>", self._draw)
+        self._desenhar(cor)
 
-    def _draw(self, event):
+        self.bind("<Enter>", lambda _: self._desenhar(self.cor_hover))
+        self.bind("<Leave>", lambda _: self._desenhar(self.cor))
+        self.bind("<Button-1>", lambda _: self.comando())
+
+    def _desenhar(self, cor_fundo):
         self.delete("all")
-        w, h = event.width, event.height
-
-        # Fundo gradiente simulado com retangulos
-        for i in range(0, h, 4):
-            ratio = i / max(h, 1)
-            r = int(int(NAVY[1:3], 16) * (1 - ratio * 0.25) +
-                    int(NAVY_DARK[1:3], 16) * ratio * 0.25)
-            g = int(int(NAVY[3:5], 16) * (1 - ratio * 0.25) +
-                    int(NAVY_DARK[3:5], 16) * ratio * 0.25)
-            b = int(int(NAVY[5:7], 16) * (1 - ratio * 0.25) +
-                    int(NAVY_DARK[5:7], 16) * ratio * 0.25)
-            color = f"#{r:02x}{g:02x}{b:02x}"
-            self.create_rectangle(0, i, w, i + 4, fill=color, outline=color)
-
-        # Formas geometricas decorativas
-        self.create_rectangle(w * 0.55, h * 0.12, w * 0.72, h * 0.30,
-                              fill=GOLD, outline="")
-        self.create_rectangle(w * 0.74, h * 0.16, w * 0.82, h * 0.24,
-                              fill=GOLD_DARK, outline="")
-        self.create_rectangle(w * 0.62, h * 0.55, w * 0.78, h * 0.72,
-                              fill=NAVY_LIGHT, outline="")
-        self.create_rectangle(w * 0.18, h * 0.62, w * 0.32, h * 0.78,
-                              fill=GOLD, outline="")
-        self.create_rectangle(w * 0.82, h * 0.78, w * 0.92, h * 0.88,
-                              fill=NAVY_LIGHT, outline="")
-
-        # Pontos / dots
-        for x, y in [(0.15, 0.20), (0.20, 0.25), (0.25, 0.20),
-                     (0.85, 0.50), (0.90, 0.55), (0.85, 0.60)]:
-            self.create_oval(w * x - 4, h * y - 4, w * x + 4, h * y + 4,
-                             fill=GOLD, outline="")
-
-        # Headline e texto
+        r = self.raio
+        pontos = [
+            r, 0,
+            self.largura - r, 0,
+            self.largura, 0,
+            self.largura, r,
+            self.largura, self.altura - r,
+            self.largura, self.altura,
+            self.largura - r, self.altura,
+            r, self.altura,
+            0, self.altura,
+            0, self.altura - r,
+            0, r,
+            0, 0,
+        ]
+        self.create_polygon(pontos, smooth=True, fill=cor_fundo, outline=cor_fundo)
         self.create_text(
-            w / 2, h * 0.42,
-            text="Seu futuro\ncomeça aqui",
-            fill=WHITE,
-            font=("Segoe UI", 32, "bold"),
-            justify="center",
-        )
-        self.create_text(
-            w / 2, h * 0.50,
-            text="Faça parte da nossa comunidade educacional\n"
-                 "e dê o próximo passo na sua carreira.",
-            fill="#C9D6E5",
-            font=("Segoe UI", 11),
-            justify="center",
+            self.largura // 2,
+            self.altura // 2,
+            text=self.texto,
+            fill=self.cor_texto,
+            font=self.fonte,
         )
 
-        # Linha decorativa
-        self.create_rectangle(w * 0.45, h * 0.45, w * 0.55, h * 0.452,
-                              fill=GOLD, outline="")
+
+class LogoSF(tk.Canvas):
+    """Logo SF com chapéu de formatura desenhado no Canvas."""
+
+    def __init__(self, master, tamanho=72):
+        super().__init__(
+            master,
+            width=tamanho,
+            height=tamanho,
+            bg=COR_BRANCO,
+            highlightthickness=0,
+            bd=0,
+        )
+        self.tamanho = tamanho
+        self._desenhar()
+
+    def _desenhar(self):
+        t = self.tamanho
+        c = t / 2
+
+        # círculo externo azul
+        self.create_oval(2, 2, t - 2, t - 2, outline=COR_AZUL_ESCURO, width=2)
+        # anel dourado
+        margem = t * 0.09
+        self.create_oval(
+            margem, margem, t - margem, t - margem,
+            outline=COR_AMARELO, width=2,
+        )
+
+        # letra S em dourado
+        self.create_text(
+            c - t * 0.14,
+            c + t * 0.05,
+            text="S",
+            fill=COR_AMARELO,
+            font=("Georgia", int(t * 0.50), "bold"),
+        )
+        # letra F em azul
+        self.create_text(
+            c + t * 0.16,
+            c + t * 0.10,
+            text="F",
+            fill=COR_AZUL_ESCURO,
+            font=("Georgia", int(t * 0.50), "bold"),
+        )
+
+        # chapéu de formatura
+        cx = c + t * 0.02
+        cy = c - t * 0.20
+        meio = t * 0.18
+        self.create_polygon(
+            cx - meio, cy,
+            cx, cy - meio * 0.55,
+            cx + meio, cy,
+            cx, cy + meio * 0.55,
+            fill=COR_AZUL_ESCURO, outline=COR_AZUL_ESCURO,
+        )
+        # borla
+        self.create_line(cx + meio * 0.7, cy, cx + meio * 0.95, cy + meio * 0.7,
+                         fill=COR_AZUL_ESCURO, width=2)
+        self.create_oval(
+            cx + meio * 0.85, cy + meio * 0.55,
+            cx + meio * 1.10, cy + meio * 0.85,
+            fill=COR_AMARELO, outline=COR_AZUL_ESCURO,
+        )
 
 
-# ----------------- App principal -----------------
+class PainelDireito(tk.Canvas):
+    """Painel direito visual com formas geométricas, gradiente e textos."""
+
+    def __init__(self, master, largura, altura):
+        super().__init__(
+            master,
+            width=largura,
+            height=altura,
+            bg=COR_AZUL_PAINEL,
+            highlightthickness=0,
+            bd=0,
+        )
+        self.largura = largura
+        self.altura = altura
+        self.bind("<Configure>", self._on_resize)
+        self._desenhar(largura, altura)
+
+    def _on_resize(self, event):
+        if event.width > 10 and event.height > 10:
+            self.largura = event.width
+            self.altura = event.height
+            self._desenhar(event.width, event.height)
+
+    def _desenhar(self, w, h):
+        self.delete("all")
+
+        # gradiente vertical leve (faixas horizontais)
+        passos = 60
+        for i in range(passos):
+            t = i / passos
+            r1, g1, b1 = 0x3C, 0x50, 0x7D
+            r2, g2, b2 = 0x2A, 0x3B, 0x66
+            r = int(r1 + (r2 - r1) * t)
+            g = int(g1 + (g2 - g1) * t)
+            b = int(b1 + (b2 - b1) * t)
+            cor = f"#{r:02x}{g:02x}{b:02x}"
+            y0 = int(h * i / passos)
+            y1 = int(h * (i + 1) / passos) + 1
+            self.create_rectangle(0, y0, w, y1, fill=cor, outline=cor)
+
+        # blobs/círculos suaves de fundo
+        self._circulo_suave(w * 0.15, h * 0.20, 180, COR_AZUL_CLARO, alpha_steps=6)
+        self._circulo_suave(w * 0.85, h * 0.85, 220, COR_AZUL_CLARO, alpha_steps=6)
+
+        # quadrados inclinados decorativos (molduras "vazias" simulando recortes)
+        self._quadrado_inclinado(w * 0.25, h * 0.18, 130, 18, COR_AMARELO)
+        self._quadrado_inclinado(w * 0.42, h * 0.12, 70, -12, COR_DOURADO)
+        self._quadrado_inclinado(w * 0.78, h * 0.32, 150, -8, "#6478A8")
+        self._quadrado_inclinado(w * 0.20, h * 0.78, 140, -14, "#6478A8")
+        self._quadrado_inclinado(w * 0.88, h * 0.20, 60, 20, COR_AMARELO)
+        self._quadrado_inclinado(w * 0.65, h * 0.88, 90, 10, COR_DOURADO)
+
+        # blocos abstratos pequenos flutuantes
+        for cx, cy, s in [
+            (w * 0.10, h * 0.55, 28),
+            (w * 0.55, h * 0.18, 22),
+            (w * 0.92, h * 0.55, 30),
+            (w * 0.50, h * 0.70, 26),
+            (w * 0.30, h * 0.40, 18),
+            (w * 0.70, h * 0.50, 20),
+        ]:
+            self.create_rectangle(
+                cx - s / 2, cy - s / 2, cx + s / 2, cy + s / 2,
+                fill="#7589B8", outline="",
+            )
+
+        # pontos discretos
+        import random
+        rng = random.Random(7)
+        for _ in range(40):
+            x = rng.uniform(0, w)
+            y = rng.uniform(0, h)
+            r = rng.choice([1, 2, 2, 3])
+            self.create_oval(x, y, x + r, y + r, fill="#A8B5D6", outline="")
+
+        # textos centrais
+        cx = w / 2
+        cy = h / 2
+        self.create_text(
+            cx, cy - 30,
+            text="Seu futuro começa com\numa escolha simples",
+            fill=COR_BRANCO,
+            font=("Segoe UI", 26, "bold"),
+            justify="center",
+            width=w - 120,
+        )
+        self.create_text(
+            cx, cy + 50,
+            text=(
+                "Descubra novas oportunidades, desenvolva habilidades\n"
+                "e faça parte de uma comunidade de aprendizado moderna."
+            ),
+            fill="#D8DEEC",
+            font=("Segoe UI", 12),
+            justify="center",
+            width=w - 160,
+        )
+
+        # rodapé sutil
+        self.create_text(
+            cx, h - 24,
+            text="Sistema Fácil · Educação que transforma",
+            fill="#B6BFD6",
+            font=("Segoe UI", 9, "italic"),
+        )
+
+    def _circulo_suave(self, cx, cy, raio, cor, alpha_steps=5):
+        for i in range(alpha_steps, 0, -1):
+            r = raio * (i / alpha_steps)
+            self.create_oval(
+                cx - r, cy - r, cx + r, cy + r,
+                fill=cor, outline="",
+                stipple="gray25" if i > 1 else "gray12",
+            )
+
+    def _quadrado_inclinado(self, cx, cy, lado, angulo_graus, cor):
+        import math
+        ang = math.radians(angulo_graus)
+        meio = lado / 2
+        cantos = [(-meio, -meio), (meio, -meio), (meio, meio), (-meio, meio)]
+        pontos = []
+        for x, y in cantos:
+            xr = x * math.cos(ang) - y * math.sin(ang) + cx
+            yr = x * math.sin(ang) + y * math.cos(ang) + cy
+            pontos.extend([xr, yr])
+        # sombra
+        sombra = [p + (6 if i % 2 == 0 else 6) for i, p in enumerate(pontos)]
+        self.create_polygon(sombra, fill="#1E2C4B", outline="", stipple="gray25")
+        self.create_polygon(pontos, fill=cor, outline="")
+
+
 class SistemaFacilApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Sistema Fácil de Matrículas - Cadastro")
-        self.geometry("1100x720")
-        self.minsize(900, 640)
-        self.configure(bg=WHITE)
+        self.title("Sistema Fácil — Cadastro de Alunos")
+        self.geometry("1180x720")
+        self.minsize(1000, 640)
+        self.configure(bg=COR_BRANCO)
 
-        # Estilo ttk para combobox
-        style = ttk.Style(self)
-        try:
-            style.theme_use("clam")
-        except tk.TclError:
-            pass
-        style.configure("TCombobox",
-                        fieldbackground=WHITE,
-                        background=WHITE,
-                        foreground=DARK_TEXT,
-                        bordercolor=GRAY_BORDER,
-                        lightcolor=GRAY_BORDER,
-                        darkcolor=GRAY_BORDER,
-                        arrowcolor=NAVY,
-                        padding=6)
+        # grid 50/50
+        self.grid_columnconfigure(0, weight=1, uniform="col")
+        self.grid_columnconfigure(1, weight=1, uniform="col")
+        self.grid_rowconfigure(0, weight=1)
 
-        self._build_layout()
+        self._construir_lado_esquerdo()
+        self._construir_lado_direito()
 
-    # ---------------- Layout ----------------
-    def _build_layout(self):
-        container = tk.Frame(self, bg=WHITE)
-        container.pack(fill="both", expand=True)
+    # ---------- LADO ESQUERDO ----------
+    def _construir_lado_esquerdo(self):
+        esquerda = tk.Frame(self, bg=COR_OFFWHITE)
+        esquerda.grid(row=0, column=0, sticky="nsew")
 
-        # Coluna esquerda - formulario
-        left = tk.Frame(container, bg=WHITE)
-        left.pack(side="left", fill="both", expand=True)
+        container = tk.Frame(esquerda, bg=COR_OFFWHITE)
+        container.place(relx=0.5, rely=0.5, anchor="center")
 
-        # Coluna direita - painel visual
-        right = RightPanel(container, width=520)
-        right.pack(side="right", fill="both", expand=True)
+        # cabeçalho com logo
+        header = tk.Frame(container, bg=COR_OFFWHITE)
+        header.pack(anchor="w", pady=(0, 18))
 
-        self._build_form(left)
+        LogoSF(header, tamanho=58).pack(side="left")
+        textos_logo = tk.Frame(header, bg=COR_OFFWHITE)
+        textos_logo.pack(side="left", padx=12)
+        tk.Label(
+            textos_logo,
+            text="Sistema Fácil",
+            bg=COR_OFFWHITE,
+            fg=COR_AZUL_ESCURO,
+            font=("Georgia", 16, "bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            textos_logo,
+            text="de Matrículas",
+            bg=COR_OFFWHITE,
+            fg=COR_TEXTO_SECUNDARIO,
+            font=("Segoe UI", 10),
+        ).pack(anchor="w")
 
-    def _build_form(self, parent):
-        # Scroll container
-        canvas = tk.Canvas(parent, bg=WHITE, highlightthickness=0)
-        scrollbar = tk.Scrollbar(parent, orient="vertical",
-                                 command=canvas.yview)
-        inner = tk.Frame(canvas, bg=WHITE)
+        # título
+        tk.Label(
+            container,
+            text="Crie sua conta",
+            bg=COR_OFFWHITE,
+            fg=COR_AZUL_ESCURO,
+            font=("Segoe UI", 22, "bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            container,
+            text="Bem-vindo ao Sistema Fácil — preencha seus dados para começar.",
+            bg=COR_OFFWHITE,
+            fg=COR_TEXTO_SECUNDARIO,
+            font=("Segoe UI", 10),
+        ).pack(anchor="w", pady=(4, 22))
 
-        inner.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        # campos
+        self.campo_nome = CampoEntrada(container, "Nome completo", icone="👤")
+        self.campo_nome.pack(pady=6)
+
+        self.campo_email = CampoEntrada(container, "E-mail", icone="✉")
+        self.campo_email.pack(pady=6)
+
+        self.campo_email2 = CampoEntrada(container, "Repetir e-mail", icone="✉")
+        self.campo_email2.pack(pady=6)
+
+        self.campo_senha = CampoEntrada(container, "Senha", icone="🔒", is_password=True)
+        self.campo_senha.pack(pady=6)
+
+        self.campo_senha2 = CampoEntrada(container, "Repetir senha", icone="🔒", is_password=True)
+        self.campo_senha2.pack(pady=6)
+
+        self.campo_telefone = CampoEntrada(container, "Telefone (com DDD)", icone="📞")
+        self.campo_telefone.pack(pady=6)
+
+        # botão cadastrar
+        BotaoArredondado(
+            container,
+            texto="Cadastrar",
+            comando=self._cadastrar,
+            largura=360,
+            altura=50,
+        ).pack(pady=(20, 12))
+
+        # links
+        links = tk.Frame(container, bg=COR_OFFWHITE)
+        links.pack(pady=(0, 4))
+
+        tk.Label(
+            links,
+            text="Já tem uma conta?",
+            bg=COR_OFFWHITE,
+            fg=COR_TEXTO_SECUNDARIO,
+            font=("Segoe UI", 10),
+        ).pack(side="left")
+        link_entrar = tk.Label(
+            links,
+            text=" Entrar",
+            bg=COR_OFFWHITE,
+            fg=COR_AZUL_DESTAQUE,
+            font=("Segoe UI", 10, "bold underline"),
+            cursor="hand2",
         )
-        window_id = canvas.create_window((0, 0), window=inner, anchor="nw")
-        canvas.bind(
-            "<Configure>",
-            lambda e: canvas.itemconfigure(window_id, width=e.width),
+        link_entrar.pack(side="left")
+        link_entrar.bind("<Button-1>", lambda _: messagebox.showinfo(
+            "Entrar", "Tela de login em breve."
+        ))
+
+        ajuda = tk.Label(
+            container,
+            text="Precisa de ajuda? Fale conosco",
+            bg=COR_OFFWHITE,
+            fg=COR_TEXTO_SECUNDARIO,
+            font=("Segoe UI", 9, "underline"),
+            cursor="hand2",
         )
-        canvas.configure(yscrollcommand=scrollbar.set)
+        ajuda.pack(pady=(8, 0))
+        ajuda.bind("<Button-1>", lambda _: messagebox.showinfo(
+            "Ajuda", "Entre em contato: suporte@sistemafacil.com.br"
+        ))
 
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        tk.Label(
+            container,
+            text="© 2026 Sistema Fácil de Matrículas",
+            bg=COR_OFFWHITE,
+            fg="#9AA3B5",
+            font=("Segoe UI", 8),
+        ).pack(pady=(20, 0))
 
-        # Mouse wheel scroll
-        def _on_wheel(e):
-            canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
-        canvas.bind_all("<MouseWheel>", _on_wheel)
+    # ---------- LADO DIREITO ----------
+    def _construir_lado_direito(self):
+        self.painel = PainelDireito(self, largura=590, altura=720)
+        self.painel.grid(row=0, column=1, sticky="nsew")
 
-        # ----- Conteudo do form -----
-        wrap = tk.Frame(inner, bg=WHITE)
-        wrap.pack(padx=60, pady=40, fill="x")
+    # ---------- AÇÕES ----------
+    def _cadastrar(self):
+        nome = self.campo_nome.get().strip()
+        email = self.campo_email.get().strip()
+        email2 = self.campo_email2.get().strip()
+        senha = self.campo_senha.get()
+        senha2 = self.campo_senha2.get()
+        telefone = self.campo_telefone.get().strip()
 
-        # Cabecalho com logo
-        header = tk.Frame(wrap, bg=WHITE)
-        header.pack(fill="x", anchor="w")
-
-        logo_path = os.path.join(os.path.dirname(__file__), "sf_logo.png")
-        if PIL_OK and os.path.exists(logo_path):
-            img = Image.open(logo_path).resize((48, 48), Image.LANCZOS)
-            self._logo_img = ImageTk.PhotoImage(img)
-            tk.Label(header, image=self._logo_img, bg=WHITE).pack(side="left")
-        else:
-            tk.Label(header, text="SF", bg=NAVY, fg=GOLD,
-                     font=("Segoe UI", 18, "bold"),
-                     width=3, height=1).pack(side="left")
-
-        brand = tk.Frame(header, bg=WHITE)
-        brand.pack(side="left", padx=12)
-        tk.Label(brand, text="Sistema Fácil",
-                 font=("Segoe UI", 13, "bold"),
-                 bg=WHITE, fg=NAVY).pack(anchor="w")
-        tk.Label(brand, text="de Matrículas",
-                 font=("Segoe UI", 11),
-                 bg=WHITE, fg=GRAY_TEXT).pack(anchor="w")
-
-        # Titulo
-        tk.Label(wrap, text="Crie sua conta",
-                 font=("Segoe UI", 26, "bold"),
-                 bg=WHITE, fg=DARK_TEXT).pack(anchor="w", pady=(28, 4))
-        tk.Label(wrap, text="Cadastre-se para iniciar sua jornada educacional.",
-                 font=("Segoe UI", 11),
-                 bg=WHITE, fg=GRAY_TEXT).pack(anchor="w", pady=(0, 24))
-
-        # Campos
-        self.fields = {}
-        self._add_field(wrap, "nome", "Nome completo", "João da Silva")
-        self._add_field(wrap, "email", "E-mail", "joao@exemplo.com")
-
-        row = tk.Frame(wrap, bg=WHITE)
-        row.pack(fill="x", pady=(0, 14))
-        self._add_field(row, "cpf", "CPF", "000.000.000-00",
-                        side="left", expand=True, padx=(0, 8))
-        self._add_field(row, "telefone", "Telefone", "(00) 00000-0000",
-                        side="left", expand=True, padx=(8, 0))
-
-        row2 = tk.Frame(wrap, bg=WHITE)
-        row2.pack(fill="x", pady=(0, 14))
-        self._add_field(row2, "nascimento", "Data de nascimento",
-                        "dd/mm/aaaa", side="left", expand=True, padx=(0, 8))
-        self._add_combo(row2, "curso", "Curso de interesse",
-                        ["Técnico em Informática", "Administração",
-                         "Design Gráfico", "Marketing Digital", "Enfermagem"],
-                        side="left", expand=True, padx=(8, 0))
-
-        row3 = tk.Frame(wrap, bg=WHITE)
-        row3.pack(fill="x", pady=(0, 14))
-        self._add_field(row3, "senha", "Senha", "••••••••",
-                        show="•", side="left", expand=True, padx=(0, 8))
-        self._add_field(row3, "confirmar", "Confirmar senha", "••••••••",
-                        show="•", side="left", expand=True, padx=(8, 0))
-
-        # Mascaras automaticas
-        self.fields["cpf"].entry.bind("<KeyRelease>",
-                                      lambda e: self._apply_mask("cpf", mask_cpf))
-        self.fields["telefone"].entry.bind("<KeyRelease>",
-                                           lambda e: self._apply_mask("telefone", mask_phone))
-        self.fields["nascimento"].entry.bind("<KeyRelease>",
-                                             lambda e: self._apply_mask("nascimento", mask_date))
-
-        # Termos
-        self.terms_var = tk.BooleanVar()
-        terms = tk.Frame(wrap, bg=WHITE)
-        terms.pack(fill="x", pady=(6, 18), anchor="w")
-        tk.Checkbutton(terms, variable=self.terms_var,
-                       bg=WHITE, activebackground=WHITE,
-                       fg=NAVY, selectcolor=WHITE,
-                       cursor="hand2").pack(side="left")
-        tk.Label(terms,
-                 text="Li e aceito os termos de uso e a política de privacidade.",
-                 bg=WHITE, fg=GRAY_TEXT,
-                 font=("Segoe UI", 10)).pack(side="left")
-
-        # Botao principal
-        btn = HoverButton(wrap, bg=NAVY, hover_bg=NAVY_DARK, fg=WHITE,
-                          text="Cadastrar",
-                          font=("Segoe UI", 12, "bold"),
-                          padx=24, pady=12,
-                          command=self._submit)
-        btn.pack(fill="x", pady=(0, 14))
-
-        # Link login
-        link = tk.Frame(wrap, bg=WHITE)
-        link.pack(anchor="w")
-        tk.Label(link, text="Já tem uma conta?",
-                 bg=WHITE, fg=GRAY_TEXT,
-                 font=("Segoe UI", 10)).pack(side="left")
-        login_lbl = tk.Label(link, text=" Entrar",
-                             bg=WHITE, fg=NAVY,
-                             cursor="hand2",
-                             font=("Segoe UI", 10, "bold underline"))
-        login_lbl.pack(side="left")
-        login_lbl.bind("<Button-1>",
-                       lambda _: messagebox.showinfo(
-                           "Entrar", "Tela de login ainda não implementada."))
-
-    # ---------------- Helpers de campo ----------------
-    def _add_field(self, parent, key, label, placeholder,
-                   show=None, side=None, expand=False, padx=0):
-        col = tk.Frame(parent, bg=WHITE)
-        if side:
-            col.pack(side=side, fill="x", expand=expand, padx=padx)
-        else:
-            col.pack(fill="x", pady=(0, 14))
-
-        tk.Label(col, text=label, bg=WHITE, fg=DARK_TEXT,
-                 font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 4))
-        entry = RoundedEntry(col, placeholder=placeholder, show=show)
-        entry.pack(fill="x")
-        self.fields[key] = entry
-
-    def _add_combo(self, parent, key, label, options,
-                   side=None, expand=False, padx=0):
-        col = tk.Frame(parent, bg=WHITE)
-        if side:
-            col.pack(side=side, fill="x", expand=expand, padx=padx)
-        else:
-            col.pack(fill="x", pady=(0, 14))
-
-        tk.Label(col, text=label, bg=WHITE, fg=DARK_TEXT,
-                 font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 4))
-        var = tk.StringVar()
-        combo = ttk.Combobox(col, textvariable=var, values=options,
-                             state="readonly", font=("Segoe UI", 11))
-        combo.set("Selecione um curso")
-        combo.pack(fill="x", ipady=6)
-        self.fields[key] = combo
-
-    def _apply_mask(self, key, fn):
-        field = self.fields[key]
-        if field._has_placeholder:
+        if not all([nome, email, email2, senha, senha2, telefone]):
+            messagebox.showwarning(
+                "Campos obrigatórios",
+                "Por favor, preencha todos os campos para continuar.",
+            )
             return
-        cur = field.var.get()
-        new = fn(cur)
-        if new != cur:
-            field.var.set(new)
-            field.entry.icursor("end")
 
-    # ---------------- Submissao ----------------
-    def _get(self, key):
-        f = self.fields[key]
-        if isinstance(f, RoundedEntry):
-            return f.get().strip()
-        return f.get().strip()
+        if len(nome.split()) < 2:
+            messagebox.showwarning(
+                "Nome inválido",
+                "Informe seu nome completo (nome e sobrenome).",
+            )
+            return
 
-    def _set_error(self, key, on):
-        f = self.fields[key]
-        if isinstance(f, RoundedEntry):
-            f.set_error(on)
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+            messagebox.showwarning("E-mail inválido", "Digite um e-mail válido.")
+            return
 
-    def _submit(self):
-        errors = []
+        if email != email2:
+            messagebox.showwarning(
+                "E-mails diferentes", "Os e-mails informados não coincidem."
+            )
+            return
 
-        nome = self._get("nome")
-        email = self._get("email")
-        cpf = self._get("cpf")
-        tel = self._get("telefone")
-        nasc = self._get("nascimento")
-        curso = self._get("curso")
-        senha = self._get("senha")
-        conf = self._get("confirmar")
-
-        # Reset errors
-        for k in ("nome", "email", "cpf", "telefone",
-                  "nascimento", "senha", "confirmar"):
-            self._set_error(k, False)
-
-        if len(nome) < 3:
-            errors.append("Informe seu nome completo.")
-            self._set_error("nome", True)
-        if not EMAIL_RE.match(email):
-            errors.append("E-mail inválido.")
-            self._set_error("email", True)
-        if not validate_cpf(cpf):
-            errors.append("CPF inválido.")
-            self._set_error("cpf", True)
-        if len(re.sub(r"\D", "", tel)) < 10:
-            errors.append("Telefone inválido.")
-            self._set_error("telefone", True)
-        if not validate_date(nasc):
-            errors.append("Data de nascimento inválida (use dd/mm/aaaa).")
-            self._set_error("nascimento", True)
-        if curso == "Selecione um curso" or not curso:
-            errors.append("Selecione um curso de interesse.")
         if len(senha) < 8:
-            errors.append("A senha deve ter pelo menos 8 caracteres.")
-            self._set_error("senha", True)
-        if senha != conf:
-            errors.append("As senhas não conferem.")
-            self._set_error("confirmar", True)
-        if not self.terms_var.get():
-            errors.append("Você precisa aceitar os termos de uso.")
+            messagebox.showwarning(
+                "Senha curta", "A senha deve ter no mínimo 8 caracteres."
+            )
+            return
 
-        if errors:
-            messagebox.showerror("Verifique os campos",
-                                 "\n".join(f"• {e}" for e in errors))
+        if senha != senha2:
+            messagebox.showwarning(
+                "Senhas diferentes", "As senhas informadas não coincidem."
+            )
+            return
+
+        digitos = re.sub(r"\D", "", telefone)
+        if len(digitos) < 10:
+            messagebox.showwarning(
+                "Telefone inválido",
+                "Informe um telefone válido com DDD (mínimo 10 dígitos).",
+            )
             return
 
         messagebox.showinfo(
             "Cadastro realizado",
             f"Bem-vindo(a), {nome.split()[0]}!\n\n"
-            f"Sua matrícula no curso de {curso} foi recebida.\n"
-            "Em breve você receberá um e-mail de confirmação.",
+            "Sua conta no Sistema Fácil foi criada com sucesso.",
         )
 
 
