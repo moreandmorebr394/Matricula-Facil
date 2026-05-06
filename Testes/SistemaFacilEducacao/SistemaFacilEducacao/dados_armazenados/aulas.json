@@ -1,0 +1,22 @@
+[
+  {
+    "id": 2,
+    "turma_id": 1,
+    "titulo": "Módulo 1",
+    "descricao": "Começo",
+    "data": "12/12/1990",
+    "horario": "15h",
+    "professor": "Joaozinho",
+    "realizada": true
+  },
+  {
+    "id": 1,
+    "turma_id": 1,
+    "titulo": "Introducao ao Marketing Digital",
+    "descricao": "Conceitos fundamentais e tendencias 2024",
+    "data": "01/06/2024",
+    "horario": "19h",
+    "professor": "Prof. Roberto Almeida",
+    "realizada": true
+  }
+]
