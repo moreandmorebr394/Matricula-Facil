@@ -1,0 +1,1 @@
+"""Configurações administrativas do sistema."""
