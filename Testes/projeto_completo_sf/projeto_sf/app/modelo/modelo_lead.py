@@ -119,7 +119,12 @@ def contar_leads_por_origem():
         )
         resultados = cursor.fetchall()
         cursor.close()
-    return [dict(r) if not isinstance(r, dict) else r for r in resultados]
+    return {
+        (r["como_conheceu"] if isinstance(r, dict) else r["como_conheceu"]): (
+            r["total"] if isinstance(r, dict) else r["total"]
+        )
+        for r in resultados
+    }
 
 
 def total_leads():
