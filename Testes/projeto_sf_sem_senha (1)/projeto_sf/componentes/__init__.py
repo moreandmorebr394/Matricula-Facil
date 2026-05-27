@@ -1,1 +1,0 @@
-"""Componentes visuais reutilizáveis."""

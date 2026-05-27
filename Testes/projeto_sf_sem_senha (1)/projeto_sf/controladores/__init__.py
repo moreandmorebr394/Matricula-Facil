@@ -1,1 +1,0 @@
-"""Camada Controller do MVC."""

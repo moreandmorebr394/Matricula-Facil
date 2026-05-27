@@ -1,1 +1,0 @@
-"""Camada Model do MVC."""
