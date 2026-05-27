@@ -1,1 +1,0 @@
-# Componentes do Sistema Fácil
